@@ -5,43 +5,17 @@ use crate::config::{
     PayloadSize,
 };
 use crate::error::TransceiverError;
+use crate::nrf24::{Nrf24l01, NrfResult, Sync};
 use crate::register_acces::{Instruction, Register};
 use crate::status::{Interrupts, Status};
 use crate::MAX_PAYLOAD_SIZE;
 use embedded_hal::{
     delay::DelayNs,
-    digital::{ErrorType as PinErrorType, OutputPin},
-    spi::{ErrorType as SpiErrorType, Operation, SpiDevice},
+    digital::OutputPin,
+    spi::{Operation, SpiDevice},
 };
 
-/// The nRF24L01 driver type. This struct encapsulates all functionality.
-///
-/// For the different configuration options see: [`NrfConfig`].
-///
-/// # Examples
-/// ```
-/// use nrf24::Nrf24l01;
-/// use nrf24::config::NrfConfig;
-///
-/// // Initialize the chip with deafault configuration.
-/// let nrf24 = Nrf24l01::new(spi, ce, &mut delay, NrfConfig::default()).unwrap();
-///
-/// ```
-pub struct Nrf24l01<SPI, CE> {
-    spi: SPI,
-    // Chip Enable Pin
-    ce: CE,
-    // Config Register
-    config_reg: u8,
-    // Payload size
-    payload_size: PayloadSize,
-}
-
-// Associated type alias to simplify our result types.
-type NrfResult<T, SPI, CE> =
-    Result<T, TransceiverError<<SPI as SpiErrorType>::Error, <CE as PinErrorType>::Error>>;
-
-impl<SPI, CE> Nrf24l01<SPI, CE>
+impl<SPI, CE> Nrf24l01<SPI, CE, Sync>
 where
     SPI: SpiDevice,
     CE: OutputPin,
@@ -88,7 +62,7 @@ where
     ///     .pa_level(PALevel::Low);
     ///
     /// // Initialize the nRF24L01 driver
-    /// match Nrf24l01::new(spi, ce, &mut delay, config) {
+    /// match Nrf24l01::new_blocking(spi, ce, &mut delay, config) {
     ///     Ok(nrf) => {
     ///         // Successfully initialized
     ///         // Continue with nrf.open_reading_pipe(), nrf.start_listening(), etc.
@@ -104,7 +78,7 @@ where
     ///
     /// The chip requires some settling time after power-up. This function
     /// includes appropriate delays to ensure reliable initialization.
-    pub fn new<D: DelayNs>(
+    pub fn new_blocking<D: DelayNs>(
         spi: SPI,
         ce: CE,
         delay: &mut D,
@@ -115,6 +89,7 @@ where
             ce,
             config_reg: 0,
             payload_size: PayloadSize::Static(0),
+            _mode: Default::default(),
         };
 
         // Set the output pin to the correct levels
@@ -339,7 +314,7 @@ where
     /// // We will be receiving float values
     /// // Set the payload size to 4 bytes, the size of an f32
     /// let config = NrfConfig::default().payload_size(PayloadSize::Static(4));
-    /// let chip = Nrf24l01::new(spi, ce, &mut delay, config).unwrap();
+    /// let chip = Nrf24l01::new_blocking(spi, ce, &mut delay, config).unwrap();
     /// // Put the chip in listening mode
     /// chip.open_reading_pipe(DataPipe::DP0, b"Node1");
     /// chip.start_listening();
@@ -406,7 +381,7 @@ where
     /// // We will be sending float values
     /// // Set the payload size to 4 bytes, the size of an f32
     /// let config = NrfConfig::default().payload_size(PayloadSize::Static(4));
-    /// let chip = Nrf24l01::new(spi, ce, &mut delay, config).unwrap();
+    /// let chip = Nrf24l01::new_blocking(spi, ce, &mut delay, config).unwrap();
     /// // Put the chip in transmission mode
     /// chip.open_writing_pipe(b"Node1");
     /// chip.stop_listening();
@@ -502,7 +477,7 @@ where
     /// # Examples
     /// ```rust
     /// // Initialize the chip
-    /// let mut chip = Nrf24l01::new(spi_struct, ce_pin, delay, NrfConfig::default())?;
+    /// let mut chip = Nrf24l01::new_blocking(spi_struct, ce_pin, delay, NrfConfig::default())?;
     ///
     /// let retries_config = chip.retries()?;
     /// // Default values for the chip
@@ -554,7 +529,7 @@ where
     /// # Examples
     /// ```rust
     /// // Initialize the chip
-    /// let mut chip = Nrf24l01::new(spi_struct, ce_pin, delay, NrfConfig::default())?;
+    /// let mut chip = Nrf24l01::new_blocking(spi_struct, ce_pin, delay, NrfConfig::default())?;
     /// // Default is channel 76
     /// assert_eq!(chip.channel()?, 76);
     /// ```
@@ -585,7 +560,7 @@ where
     /// # Examples
     /// ```rust
     /// // Initialize the chip
-    /// let mut chip = Nrf24l01::new(spi_struct, ce_pin, delay, NrfConfig::default())?;
+    /// let mut chip = Nrf24l01::new_blocking(spi_struct, ce_pin, delay, NrfConfig::default())?;
     /// // Default is 2 Mb/s
     /// assert_eq!(chip.data_rate()?, DataRate::R2Mbps);
     /// ```
@@ -598,7 +573,7 @@ where
     /// # Examples
     /// ```rust
     /// // Initialize the chip
-    /// let mut chip = Nrf24l01::new(spi_struct, ce_pin, delay, NrfConfig::default())?;
+    /// let mut chip = Nrf24l01::new_blocking(spi_struct, ce_pin, delay, NrfConfig::default())?;
     /// // Default is Min PALevel
     /// assert_eq!(chip.power_amp_level()?, PALevel::Min);
     /// ```
@@ -624,6 +599,18 @@ where
     /// ```
     pub fn flush_rx(&mut self) -> NrfResult<(), SPI, CE> {
         self.send_command(Instruction::FRX).map(|_| ())
+    }
+
+    pub fn read_rx_payload_width(&mut self) -> NrfResult<u8, SPI, CE> {
+       // Ok(self.send_command(Instruction::RPW)?.raw())
+        let mut buf = [0_u8];
+        self.spi
+            .transaction(&mut [
+                Operation::Write(&[Instruction::RPW.opcode()]),
+                Operation::Read(&mut buf),
+            ])
+            .map_err(TransceiverError::Spi)?;
+        Ok(buf[0])
     }
 
     /// Write ACK payload to TX FIFO to be sent with next ACK packet.
@@ -838,7 +825,7 @@ where
         self.config_reg &= !Interrupts::all().raw();
         // Set configured interrupt mask
         self.config_reg |= irq.raw();
-        self.write_register(Register::STATUS, self.config_reg)?;
+        self.write_register(Register::CONFIG, self.config_reg)?;
         Ok(())
     }
 
@@ -865,6 +852,10 @@ where
             .crc_encoding_scheme(self.crc_encoding_scheme()?)
             .auto_retry(self.retries()?);
         Ok(config)
+    }
+
+    pub fn rx_fifo_empty(&mut self) -> NrfResult<bool, SPI, CE> {
+        Ok((self.read_register(Register::FIFO_STATUS)? & 1) == 1)
     }
 
     /// Sends an instruction over the SPI bus without extra data.
@@ -932,7 +923,7 @@ where
 /// Helper functions for setting Chip Enable pin.
 /// Returns the error enum defined in this crate, so the rest of the code can use the
 /// `?` operator.
-impl<SPI, CE> Nrf24l01<SPI, CE>
+impl<SPI, CE, Mode> Nrf24l01<SPI, CE, Mode>
 where
     SPI: SpiDevice,
     CE: OutputPin,
