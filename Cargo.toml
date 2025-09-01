@@ -12,7 +12,6 @@ categories = ["embedded", "hardware-support", "no-std"]
 homepage = "https://github.com/TomasVanRoose/RF24-rs"
 readme = "README.md"
 edition = "2021"
-rust = "1.81.0"
 
 exclude = [
     "examples/",
@@ -21,7 +20,9 @@ exclude = [
 [dependencies]
 defmt = { version = "0.3.10", optional = true }
 embedded-hal = "1.0.0"
+embedded-hal-async = { version = "1.0.0", optional = true }
 
 [features]
 defmt = ["dep:defmt"]
+async = ["dep:embedded-hal-async"]
 
