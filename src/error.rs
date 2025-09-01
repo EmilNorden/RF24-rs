@@ -44,4 +44,11 @@ pub enum TransceiverError<SpiErr, CeErr> {
         /// The actual buffer size that was provided
         actual: u8,
     },
+
+    /// A packet was received where the payload size was larger than 32
+    ///
+    /// When using dynamic payload sizes and reading packet payloads, the size fields
+    /// must be validated to make sure it is equal to or less than 32. If not, the packet is malformed and
+    /// the RX FIFO is flushed.
+    InvalidDynamicPayloadSize(u8)
 }

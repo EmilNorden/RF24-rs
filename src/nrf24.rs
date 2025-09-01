@@ -376,7 +376,15 @@ where
                 }
                 n as usize
             }
-            PayloadSize::Dynamic => core::cmp::min(buf.len(), MAX_PAYLOAD_SIZE as usize),
+            PayloadSize::Dynamic => {
+                let payload_len = self.read_rx_payload_width()?;
+                if payload_len > 32 || payload_len == 0 {
+                    self.flush_rx()?;
+                    return Err(TransceiverError::InvalidDynamicPayloadSize(payload_len));
+                }
+
+                payload_len as usize
+            },
         };
 
         // Write to spi
@@ -389,6 +397,7 @@ where
 
         Ok(len)
     }
+
 
     /// Writes data to the opened channel.
     ///
@@ -637,6 +646,19 @@ where
 
         Ok(())
     }
+    /// Reads the width/length of the top payload in the RX FIFO.
+    pub fn read_rx_payload_width(&mut self) -> NrfResult<u8, SPI, CE> {
+        // Ok(self.send_command(Instruction::RPW)?.raw())
+        let mut buf = [0_u8];
+        self.spi
+            .transaction(&mut [
+                Operation::Write(&[Instruction::RPW.opcode()]),
+                Operation::Read(&mut buf),
+            ])
+            .map_err(TransceiverError::Spi)?;
+        Ok(buf[0])
+    }
+
 
     /// Enable CRC encoding scheme.
     ///
