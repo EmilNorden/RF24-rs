@@ -33,8 +33,15 @@ pub struct Nrf24l01<SPI, CE, Mode> {
 }
 
 // Associated type alias to simplify our result types.
+#[cfg(not(feature = "async"))]
 type NrfResult<T, SPI, CE> =
 Result<T, TransceiverError<<SPI as embedded_hal::spi::ErrorType>::Error, <CE as embedded_hal::digital::ErrorType>::Error>>;
+
+#[cfg(feature = "async")]
+type NrfResult<T, SPI, CE> =
+Result<T, TransceiverError<<SPI as embedded_hal_async::spi::ErrorType>::Error, <CE as embedded_hal::digital::ErrorType>::Error>>;
+
+
 
 #[cfg(not(feature = "async"))]
 pub mod sync;

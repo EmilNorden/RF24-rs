@@ -601,18 +601,6 @@ where
         self.send_command(Instruction::FRX).map(|_| ())
     }
 
-    pub fn read_rx_payload_width(&mut self) -> NrfResult<u8, SPI, CE> {
-       // Ok(self.send_command(Instruction::RPW)?.raw())
-        let mut buf = [0_u8];
-        self.spi
-            .transaction(&mut [
-                Operation::Write(&[Instruction::RPW.opcode()]),
-                Operation::Read(&mut buf),
-            ])
-            .map_err(TransceiverError::Spi)?;
-        Ok(buf[0])
-    }
-
     /// Write ACK payload to TX FIFO to be sent with next ACK packet.
     ///
     /// # Arguments
