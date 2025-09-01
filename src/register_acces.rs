@@ -50,14 +50,15 @@ pub(crate) enum Instruction {
     FTX = 0b1110_0001,
     /// Flush RX FIFO, used in RX mode.
     FRX = 0b1110_0010,
+    /// Read RX payload width for top payload in the RX FIFO. Flush RX FIFO if read value is larger than 32 bytes.
+    RPW = 0b0110_0000,
     /// Write payload to be transmitted with ACK packet
     /// Last 3 bits is pipe number (valid range: 000-101)
     WAP = 0b1010_1000,
     /// No operation. Might be used to read STATUS register.
     NOP = 0b1111_1111,
-
-
 }
+
 
 impl Instruction {
     pub(crate) fn opcode(&self) -> u8 {
