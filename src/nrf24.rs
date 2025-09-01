@@ -139,6 +139,11 @@ where
         chip.reset_status()?;
         // This channel should be universally safe and not bleed over into adjacent spectrum.
         chip.set_channel(config.channel)?;
+
+        // Enabled/disable ack payloads.
+        // Should we validate that dynamic payload is enabled if ack payload is enabled?
+        // It seems like it must be according to the datasheet.
+        chip.set_ack_payloads_enabled(config.ack_payloads_enabled)?;
         // flush buffers
         chip.flush_rx()?;
         chip.flush_tx()?;
@@ -514,6 +519,26 @@ where
         self.write_register(Register::RF_CH, (u8::MAX >> 1) & channel)
     }
 
+    /// Enabled or disables acknowledgement payloads
+    ///
+    /// # Arguments
+    ///
+    /// * 'enabled' true to enable acknowledgement payloads, false to disable them.
+    ///
+    /// # Examples
+    /// ```rust
+    /// nrf24l01.set_ack_payloads_enabled(true)?;
+    pub fn set_ack_payloads_enabled(&mut self, enabled: bool) -> NrfResult<(), SPI, CE> {
+        let feature = self.read_register(Register::FEATURE)?;
+        if enabled {
+            self.write_register(Register::FEATURE, feature | (1 << 1))?
+        } else {
+            self.write_register(Register::FEATURE, feature & !(1 << 1))?
+        }
+
+        Ok(())
+    }
+
     /// Return the frequency channel nRF24L01 operates on.
     /// Note that the actual frequency will we the channel +2400 MHz.
     ///
@@ -590,6 +615,27 @@ where
     /// ```
     pub fn flush_rx(&mut self) -> NrfResult<(), SPI, CE> {
         self.send_command(Instruction::FRX).map(|_| ())
+    }
+
+    /// Write ACK payload to TX FIFO to be sent with next ACK packet.
+    ///
+    /// # Arguments
+    ///
+    /// * pipe The pipe for which the ACK payload should be sent
+    /// * payload: The actual payload, maximum 32 bytes.
+    ///
+    /// # Example
+    /// ```rust
+    /// nrf24l01.write_ack_payload(DataPipe::DP0, payload_buffer)?;
+    pub fn write_ack_payload(&mut self, pipe: DataPipe, payload: &[u8]) -> NrfResult<(), SPI, CE> {
+        self.spi
+            .transaction(&mut [
+                Operation::Write(&[Instruction::WAP.opcode() | pipe.pipe()]),
+                Operation::Write(payload),
+            ])
+            .map_err(TransceiverError::Spi)?;
+
+        Ok(())
     }
 
     /// Enable CRC encoding scheme.
