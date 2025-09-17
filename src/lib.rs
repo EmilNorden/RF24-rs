@@ -151,7 +151,7 @@ mod nrf24;
 mod register_acces;
 pub mod status;
 
-pub use crate::nrf24::Nrf24l01;
+pub use crate::nrf24::{Nrf24l01, Sync, Async};
 
 /// SPI mode. Use this when initializing the SPI instance.
 pub const SPI_MODE: embedded_hal::spi::Mode = embedded_hal::spi::MODE_0;
