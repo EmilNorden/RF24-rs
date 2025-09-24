@@ -28,12 +28,6 @@ pub enum TransceiverError<SpiErr, CeErr> {
     /// the specific nature of the communication failure.
     Comm(u8),
 
-    /// The maximum number of retransmit attempts was reached without receiving an ACK.
-    ///
-    /// This occurs when auto-acknowledgement is enabled and the receiver does not
-    /// acknowledge receipt of the transmitted packet after the configured number of retries.
-    MaxRetries,
-
     /// The provided buffer is too small for the requested operation.
     ///
     /// This error includes information about the required buffer size and the

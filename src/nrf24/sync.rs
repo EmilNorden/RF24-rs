@@ -426,20 +426,14 @@ where
 
         let status = self.send_command_bytes(Instruction::WTX, &buf[..send_count])?;
 
+        // Clear interrupt flags
+        self.write_register(Register::STATUS, Interrupts::all().raw())?;
+
         // Start transmission:
         // pulse CE pin to signal transmission start
         self.set_ce_high()?;
         delay.delay_us(10);
         self.set_ce_low()?;
-
-        // Clear interrupt flags
-        self.write_register(Register::STATUS, Interrupts::all().raw())?;
-
-        // Max retries exceeded
-        if status.reached_max_retries() {
-            self.flush_tx()?;
-            return Err(TransceiverError::MaxRetries);
-        }
 
         Ok(())
     }
