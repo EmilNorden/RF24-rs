@@ -486,7 +486,7 @@ where
     /// Returns the number of retransmissions in the last transaction.
     pub fn retries_in_last_transmission(&mut self) -> NrfResult<u8, SPI, CE> {
         let value =  self.read_register(Register::OBSERVE_TX)?;
-        Ok(value & 0b111)
+        Ok(value & 0b1111)
     }
 
     /// Set the frequency channel nRF24L01 operates on.
